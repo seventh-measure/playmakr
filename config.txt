@@ -1,0 +1,4 @@
+[Section1]
+client_id = 1f309479b51d48b7b8f0458b096de952
+client_secret = 041e778b0ec74b87a7b61bb81e5a3c08
+redirect_url = https://google.com/
