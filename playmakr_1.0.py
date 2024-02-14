@@ -11,11 +11,24 @@ def spListConv(spList):
 class seedPlaylist:
     def __init__(self, title, playlistID):
         self.title = title
-        self.spID = playlistID
+        self.playlistID = playlistID
         self.trackIDs = []
-    
+        
+        self.genres = []
+        self.aBar = None # acousticness
+        self.dBar = None # danceability
+        self.eBar = None # energy
+        self.iBar = None # instrumentalness
+        self.sBar = None # speechiness
+        self.tBar = None # tempo
+        self.vBar = None # valence
+        
     def fetchTrackInfo(self, playlistID):
         self.trackIDs.append(sp.playlist_tracks(playlistID, fields='items(track(id))')['items'])
+
+        for trackID in self.trackIDs:
+            
+            
 
         
 
