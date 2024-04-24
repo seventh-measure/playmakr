@@ -161,6 +161,19 @@ def calcFitScore(chunk, seedPlaylists): # with track chunks now having all relev
             track['fit scores'].append({playlistID: fitScore})
     return chunk
 
+def sortChunk(calcChunk, seedPlaylists): # with chunks' fit scores, sort song id's into there respective playlists
+    trackMap = {}
+    for track in calcChunk:
+        fitScores = {playlistID: trackID for fitScore in track['fit scores'] for playlistID, trackID in fitScore.items()}
+        bestSeed = max(fitScores, key=fitScores.get)
+        trackMap[track['id']] = bestSeed
+    return trackMap
+
+def addTracksToPlaylists(trackMap):
+    for track_id, playlist_id in trackMap.items():
+        track_exists = sp.track(track_id)
+        if track_exists:
+            sp.playlist_add_items(playlist_id=playlist_id, items=track_id)
 
 config = configparser.ConfigParser()
 config.read('config.txt')
@@ -177,5 +190,20 @@ playlistTest = fetchUserPlaylists()
 seedtest = seedSelection(playlistTest)
 seedPlaylists = fetchSeedPlaylistTracks(seedtest)
 seeds = fetchSeedAttributes(seedPlaylists)
-chunk = fetchChunkAttributes(fetchUserSongs(0))
-print(calcFitScore(chunk, seeds))
+
+trackMappings = []
+offset = 0
+while True:
+    print(str(offset))
+    userSongs = fetchUserSongs(offset)
+    if not userSongs:
+        break
+    chunk = fetchChunkAttributes(userSongs)
+    calcChunk = calcFitScore(chunk, seeds)
+    trackMappings.append(sortChunk(calcChunk, seedPlaylists))
+    offset += 50
+trackMap = {}
+for maps in trackMappings:
+    trackMap.update(maps)
+
+print(trackMap)
