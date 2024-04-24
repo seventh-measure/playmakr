@@ -95,6 +95,71 @@ def fetchSeedAttributes(seedPlaylists):
         playlistData['Genres'] = seedArtistsGenres['genres']
     return seedPlaylists
         
+def fetchUserSongs(offset): # fetches chunks of tracks (50 at a time) from User's liked songs
+    currentChunk = sp.current_user_saved_tracks(limit=50, offset=offset)
+    simplifiedChunk = [{
+        'id': item['track']['id'],
+        'artist_id': item['track']['artists'][0]['id']
+    } for item in currentChunk['items']]
+    return simplifiedChunk
+
+def fetchChunkAttributes(simplifiedChunk): # adds relevant attribute information to each track in a chunk
+    chunkTrackIDs = [track['id'] for track in simplifiedChunk]
+    chunkArtistIDs = [track['artist_id'] for track in simplifiedChunk]
+    chunkAttributes = sp.audio_features(chunkTrackIDs)
+    chunkArtistInfo = sp.artists(chunkArtistIDs)
+
+    acousticnessMap = {item['id']: item['acousticness'] for item in chunkAttributes}
+    danceabilityMap = {item['id']: item['danceability'] for item in chunkAttributes}
+    energyMap = {item['id']: item['energy'] for item in chunkAttributes}
+    instrumentalnessMap = {item['id']: item['instrumentalness'] for item in chunkAttributes}
+    speechinessMap = {item['id']: item['speechiness'] for item in chunkAttributes}
+    tempoMap = {item['id']: item['tempo'] for item in chunkAttributes}
+    valenceMap = {item['id']: item['valence'] for item in chunkAttributes}
+
+    genreMap = {artist['id']: artist['genres'] if artist['genres'] else [] for artist in chunkArtistInfo['artists']}
+
+    for track in simplifiedChunk:
+        track['acousticness'] = acousticnessMap.get(track['id'], [])
+        track['danceability'] = danceabilityMap.get(track['id'], [])
+        track['energy'] = energyMap.get(track['id'], [])
+        track['instrumentalness'] = instrumentalnessMap.get(track['id'], [])
+        track['speechiness'] = speechinessMap.get(track['id'], [])
+        track['tempo'] = tempoMap.get(track['id'], [])
+        track['valence'] = valenceMap.get(track['id'], [])
+        track['genres'] = genreMap.get(track['artist_id'], [])
+    
+    return simplifiedChunk
+
+def calcFitScore(chunk, seedPlaylists): # with track chunks now having all relevant data, simple functions determine each tracks best fit based on each parameter
+    for track in chunk:
+        track['fit scores'] = []
+        for playlist in seedPlaylists:
+            playlistID = playlist['ID']
+
+            acoSubScore = abs(track['acousticness'] - playlist['Attributes']['acousticness'])
+            danSubScore = abs(track['danceability'] - playlist['Attributes']['danceability'])
+            eneSubScore = abs(track['energy'] - playlist['Attributes']['energy'])
+            insSubScore = abs(track['instrumentalness'] - playlist['Attributes']['instrumentalness'])
+            speSubScore = abs(track['speechiness'] - playlist['Attributes']['speechiness'])
+            temSubScore = abs(track['tempo'] - playlist['Attributes']['tempo'])
+            valSubScore = abs(track['valence'] - playlist['Attributes']['valence'])
+
+            audioFit = (acoSubScore + danSubScore + eneSubScore + insSubScore + speSubScore + (temSubScore/100) + valSubScore)/7
+
+            genreIntersection = set(track['genres']).intersection(set(playlist['Genres']))
+            genreIntersectionCount = len(genreIntersection)
+
+            genreSubScore = (genreIntersectionCount/(len(playlist['Genres'])))
+
+            if track['artist_id'] in playlist['Artists']:
+                artistSubScore = 1
+            else:
+                artistSubScore = 0
+            
+            fitScore = (audioFit + genreSubScore + artistSubScore)/3
+            track['fit scores'].append({playlistID: fitScore})
+    return chunk
 
 
 config = configparser.ConfigParser()
@@ -111,4 +176,6 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
 playlistTest = fetchUserPlaylists()
 seedtest = seedSelection(playlistTest)
 seedPlaylists = fetchSeedPlaylistTracks(seedtest)
-print(fetchSeedAttributes(seedPlaylists))
+seeds = fetchSeedAttributes(seedPlaylists)
+chunk = fetchChunkAttributes(fetchUserSongs(0))
+print(calcFitScore(chunk, seeds))
