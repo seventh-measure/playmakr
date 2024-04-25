@@ -55,6 +55,7 @@ def fetch_seed_playlist_tracks(seed_playlists):
 
 def fetch_seed_attributes(seed_playlists):
     for playlist_data in seed_playlists:
+        print(playlist_data['name'])
         track_ids = playlist_data['track_ids']
         seed_attributes = {
             'acousticness': [],
@@ -246,3 +247,4 @@ print("\nAdding tracks to playlists...")
 add_tracks_to_playlists(track_map)
 
 print("\nAll processes completed successfully!")
+# 3,4,5,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23
