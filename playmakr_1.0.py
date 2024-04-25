@@ -100,15 +100,17 @@ def fetchUserSongs(offset): # fetches chunks of tracks (50 at a time) from User'
     simplifiedChunk = [{
         'id': item['track']['id'],
         'artist_id': item['track']['artists'][0]['id']
-    } for item in currentChunk['items']]
+    } for item in currentChunk['items'] if not item['track']['is_local']]  # Filter out local files
     return simplifiedChunk
 
-def fetchChunkAttributes(simplifiedChunk): # adds relevant attribute information to each track in a chunk
+def fetchChunkAttributes(simplifiedChunk):
     chunkTrackIDs = [track['id'] for track in simplifiedChunk]
     chunkArtistIDs = [track['artist_id'] for track in simplifiedChunk]
+    
+    # Batch API calls for attributes
     chunkAttributes = sp.audio_features(chunkTrackIDs)
     chunkArtistInfo = sp.artists(chunkArtistIDs)
-
+    
     acousticnessMap = {item['id']: item['acousticness'] for item in chunkAttributes}
     danceabilityMap = {item['id']: item['danceability'] for item in chunkAttributes}
     energyMap = {item['id']: item['energy'] for item in chunkAttributes}
@@ -145,7 +147,7 @@ def calcFitScore(chunk, seedPlaylists): # with track chunks now having all relev
             temSubScore = abs(track['tempo'] - playlist['Attributes']['tempo'])
             valSubScore = abs(track['valence'] - playlist['Attributes']['valence'])
 
-            audioFit = (acoSubScore + danSubScore + eneSubScore + insSubScore + speSubScore + (temSubScore/100) + valSubScore)/7
+            audioFit = 1 - ((acoSubScore + danSubScore + eneSubScore + insSubScore + speSubScore + (temSubScore/100) + valSubScore)/7)
 
             genreIntersection = set(track['genres']).intersection(set(playlist['Genres']))
             genreIntersectionCount = len(genreIntersection)
@@ -161,7 +163,7 @@ def calcFitScore(chunk, seedPlaylists): # with track chunks now having all relev
             track['fit scores'].append({playlistID: fitScore})
     return chunk
 
-def sortChunk(calcChunk, seedPlaylists): # with chunks' fit scores, sort song id's into there respective playlists
+def sortChunk(calcChunk): # with chunks' fit scores, sort song id's into there respective playlists
     trackMap = {}
     for track in calcChunk:
         fitScores = {playlistID: trackID for fitScore in track['fit scores'] for playlistID, trackID in fitScore.items()}
@@ -170,10 +172,9 @@ def sortChunk(calcChunk, seedPlaylists): # with chunks' fit scores, sort song id
     return trackMap
 
 def addTracksToPlaylists(trackMap):
-    for track_id, playlist_id in trackMap.items():
-        track_exists = sp.track(track_id)
-        if track_exists:
-            sp.playlist_add_items(playlist_id=playlist_id, items=track_id)
+    for playlist_id, track_ids in trackMap.items():
+        track_uris = [f"spotify:track:{track_id}" for track_id in track_ids]
+        sp.playlist_add_items(playlist_id=playlist_id, items=track_uris)
 
 config = configparser.ConfigParser()
 config.read('config.txt')
@@ -200,10 +201,15 @@ while True:
         break
     chunk = fetchChunkAttributes(userSongs)
     calcChunk = calcFitScore(chunk, seeds)
-    trackMappings.append(sortChunk(calcChunk, seedPlaylists))
+    trackMappings.append(sortChunk(calcChunk))
     offset += 50
+
 trackMap = {}
 for maps in trackMappings:
-    trackMap.update(maps)
+    for track_id, playlist_id in maps.items():
+        if playlist_id not in trackMap:
+            trackMap[playlist_id] = []
+        trackMap[playlist_id].append(track_id)
 
-print(trackMap)
+addTracksToPlaylists(trackMap)
+# 3,4,5,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23
