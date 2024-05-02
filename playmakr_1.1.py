@@ -3,6 +3,7 @@ import numpy as np
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import configparser
+import time
 
 def sp_list_conv(sp_list):
     return sp_list.split(', ')
@@ -72,8 +73,11 @@ def fetch_seed_attributes(seed_playlists):
             'genres': []
         }
 
+        print("track feature data fetching")
         track_feature_data = sp.audio_features(track_ids)
+        print("track data fetching")
         track_data = sp.tracks(track_ids)
+        print("track artist data fetching")
         track_artist_data = track_data['tracks']
 
         for data in track_feature_data:
@@ -186,7 +190,15 @@ def sort_chunk(calc_chunk):
 def add_tracks_to_playlists(track_map):
     for playlist_id, track_ids in track_map.items():
         track_uris = [f"spotify:track:{track_id}" for track_id in track_ids]
-        sp.playlist_add_items(playlist_id=playlist_id, items=track_uris)
+        batch_size = 20
+        num_batches = (len(track_uris) + batch_size - 1) // batch_size  # Calculate number of batches
+        for i in range(num_batches):
+            start_idx = i * batch_size
+            end_idx = min((i + 1) * batch_size, len(track_uris))
+            batch = track_uris[start_idx:end_idx]
+            sp.playlist_add_items(playlist_id=playlist_id, items=batch)
+            time.sleep(3)
+
 
 config = configparser.ConfigParser()
 config.read('config.txt')
@@ -218,7 +230,7 @@ seed_playlists = fetch_seed_attributes(seed_playlists)
 # Fetching user songs
 print("\nFetching user songs...")
 offset = 0
-user_songs = []
+user_song_attributes = []
 
 while True:
     print(f"Fetching songs from offset {offset}...")
@@ -227,12 +239,9 @@ while True:
     if not current_chunk:
         break
 
-    user_songs.extend(current_chunk)
+    chunk_attributes = fetch_chunk_attributes(current_chunk)
+    user_song_attributes.extend(chunk_attributes)
     offset += 50
-
-# Fetching attributes for user songs
-print("\nFetching attributes for user songs...")
-user_song_attributes = fetch_chunk_attributes(user_songs)
 
 # Calculating fit scores
 print("\nCalculating fit scores...")
