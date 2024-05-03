@@ -100,8 +100,6 @@ def fetch_seed_attributes(seed_playlists):
         total_attibute_std = sum(seed_attributes_std.values())
         seed_attributes_weight = {key: (val/total_attibute_std) if total_attibute_std != 0 else 1 for key, val in seed_attributes_std.items()}
 
-
-        seed_artists_genres['genres'] = list(set(seed_artists_genres['genres']))
         seed_artists_genres['artists'] = list(set(seed_artists_genres['artists']))
 
         playlist_data['attributes'] = seed_attributes
@@ -174,8 +172,8 @@ def calc_fit_score(chunk, seed_playlists):
             audio_fit = np.average(deltas_weights)
 
             genre_intersection = set(track['genres']).intersection(set(playlist['genres']))
-            genre_intersection_count = len(genre_intersection)
-            genre_fit = genre_intersection_count / len(playlist['genres']) if len(playlist['genres']) > 0 else 0
+            count = sum(min(track['genres'].count(value), playlist['genres'].count(value)) for value in genre_intersection)
+            genre_fit = count / len(playlist['genres']) if len(playlist['genres']) > 0 else 0
 
             fit_score = (audio_fit + genre_fit) / 2
             track['fit_scores'].append({playlist['id']: fit_score})
